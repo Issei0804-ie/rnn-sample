@@ -1,0 +1,3 @@
+venv
+data/fruits*
+__pycache__
