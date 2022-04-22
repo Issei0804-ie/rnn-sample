@@ -5,7 +5,7 @@ run:
 	singularity run --nv output/tensorflow-gpu.sif python temp.py
 
 pip-install:
-	singularity run output/tensorflow-gpu.sif pip install -r requreiments.txt
+	singularity run output/tensorflow-gpu.sif pip install -r requirement.txt
 
 sync-amane:
 	rsync -avhz main.py amane:~/cnn/main.py
