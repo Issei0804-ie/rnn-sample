@@ -11,6 +11,7 @@ def make_dict(word: str, word_to_id: dict, id_to_word: dict):
         id_to_word[n] = word_to_id
     return word_to_id, id_to_word
 
+
 def load_dataset():
     filename = "fakenews.csv"
     csv_file = open(filename, "r", encoding="utf-8", errors="", newline="")
@@ -22,7 +23,7 @@ def load_dataset():
         data.append(line[1])
 
     nlp = spacy.load('ja_ginza_electra')
-    data = data[:3]
+    #data = data[:30]
 
     word_to_id = {}
     id_to_word = {}
@@ -45,39 +46,55 @@ def load_dataset():
     return corpus, word_to_id, id_to_word
 
 
-def make_batch(corpus:list, rnn_num:int, test_data = 0.2):
-    BATCH_SIZE = len(corpus) - rnn_num + 1
-    input = []
-    target = []
-    for i in range(BATCH_SIZE):
-        input.append(corpus[i:rnn_num+i])
-        target.append(corpus[(rnn_num+i)%len(corpus)])
+def split_input_target(chunk):
+    input_text = chunk[:-1]
+    target_text = chunk[1:]
+    return input_text, target_text
 
-    flatten_list = [v for child_list in input for v in child_list]
-    input = np.array(flatten_list).reshape([-1,rnn_num])
-    target = np.array(target).reshape([-1,1])
-    return input, target
 
+def make_batch(corpus: list, seq_length, test_data=0.2):
+    BATCH_SIZE = 64
+    char_dataset = tf.data.Dataset.from_tensor_slices(corpus)
+
+    sequences = char_dataset.batch(10, drop_remainder=True)
+    dataset = sequences.map(split_input_target)
+    dataset = dataset.shuffle(1).batch(BATCH_SIZE, drop_remainder=True)
+    return dataset
+
+
+def loss(labels, logits):
+    return tf.keras.losses.sparse_categorical_crossentropy(labels, logits, from_logits=True)
 
 
 def main():
     corpus, word_to_id, id_to_word = load_dataset()
 
-    input, target = make_batch(corpus, 64)
-    train_data = tf.data.Dataset.from_tensor_slices((input, target)).shuffle(input.shape[0]).batch(64)
+    dataset = make_batch(corpus, 64)
+    for input_example, target_example in dataset.take(1):
+        print('Input data: ', input_example)
+        print(input_example.shape)
+        print('Target data:', target_example)
 
     model = tf.keras.Sequential([
-        tf.keras.layers.Embedding(len(word_to_id), 64),
-        tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64)),
-        tf.keras.layers.Dense(64, activation='relu'),
-        tf.keras.layers.Dense(1)
+        tf.keras.layers.Embedding(len(word_to_id), 64, batch_input_shape=[64, None]),
+        tf.keras.layers.GRU(64,
+                            return_sequences=True,
+                            stateful=True,
+                            recurrent_initializer='glorot_uniform'
+                            ),
+        tf.keras.layers.Dense(len(word_to_id))
     ])
-    model.compile(loss=tf.keras.losses.CategoricalCrossentropy(),
-                  optimizer=tf.keras.optimizers.Adam(1e-4),
-                  metrics=['accuracy'])
+    model.summary()
+    for input_example_batch, target_example_batch in dataset.take(2):
+        example_batch_predictions = model(input_example_batch)
+        print(example_batch_predictions.shape, "# (batch_size, sequence_length, vocab_size)")
 
-    model.fit(train_data, epochs=10)
+    model.compile(
+        loss=loss,
+        optimizer=tf.keras.optimizers.Adam(1e-4))
 
+
+    history = model.fit(dataset, epochs=1000)
 
 
 if '__main__' == __name__:
