@@ -2,3 +2,4 @@ venv
 data/fruits*
 __pycache__
 fakenews.csv
+logs

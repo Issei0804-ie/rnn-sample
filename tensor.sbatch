@@ -7,6 +7,6 @@
 #SBATCH --gpus tesla:1
 
 date
-singularity exec --nv output/tensorflow-gpu.sif python3 main.py
+singularity exec --nv output/tensorflow-gpu.sif python3 temp.py
 date
 

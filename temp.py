@@ -20,17 +20,26 @@ for line in file:
     data.append(line[1])
 
 nlp = spacy.load('ja_ginza_electra')
-
-# data = data[:3]
+print(len(data))
+print(data[10684])
+print("******")
+print(data[10685])
+data = data[10680:10700]
 
 word_to_id = {}
 id_to_word = {}
 corpus = []
+count=0
 for datum in data:
+    if count==10684:
+        continue
+    print(datum)
     doc = nlp(datum)
     for tok in doc:
         word_to_id, id_to_word = make_dict(tok.text, word_to_id, id_to_word)
         corpus.append(word_to_id[tok.text])
+    print("finish")
+    count+=1
 
 print(len(word_to_id))
 print(word_to_id)
