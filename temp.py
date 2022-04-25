@@ -20,11 +20,7 @@ for line in file:
     data.append(line[1])
 
 nlp = spacy.load('ja_ginza_electra')
-print(len(data))
-print(data[10684])
-print("******")
-print(data[10685])
-data = data[10680:10700]
+#data = data[]
 
 word_to_id = {}
 id_to_word = {}
