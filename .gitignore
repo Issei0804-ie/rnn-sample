@@ -1,4 +1,5 @@
 venv
+training_checkpoints
 data/fruits*
 __pycache__
 fakenews.csv

@@ -1,7 +1,10 @@
 import csv
+import os
+
 import spacy
 import tensorflow as tf
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def make_dict(word: str, word_to_id: dict, id_to_word: dict):
@@ -23,7 +26,7 @@ def load_dataset():
         data.append(line[1])
 
     nlp = spacy.load('ja_ginza_electra')
-    #data = data[:30]
+    #data = data
 
     word_to_id = {}
     id_to_word = {}
@@ -59,21 +62,70 @@ def make_batch(corpus: list, seq_length, test_data=0.2):
     sequences = char_dataset.batch(10, drop_remainder=True)
     dataset = sequences.map(split_input_target)
     dataset = dataset.shuffle(1).batch(BATCH_SIZE, drop_remainder=True)
-    return dataset
+
+    num = len(dataset)
+    validation = dataset.take(int(num*0.2))
+    test = dataset.take(int(num*0.2))
+    train = dataset
+    return train, validation, test
 
 
 def loss(labels, logits):
     return tf.keras.losses.sparse_categorical_crossentropy(labels, logits, from_logits=True)
 
 
+def save_graph(path: str, history ):
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title("sample")
+    plt.ylabel('loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train_loss', 'Val_loss'], loc='upper left')
+    plt.savefig(path)
+    plt.clf()
+
+
+
+def generate_text(model, start_string, word_to_id, id_to_word):
+  # 評価ステップ（学習済みモデルを使ったテキスト生成）
+
+  # 生成する文字数
+  num_generate = 1000
+
+  # 開始文字列を数値に変換（ベクトル化）
+  input_eval = [word_to_id[s] for s in start_string]
+  input_eval = tf.expand_dims(input_eval, 0)
+
+  # 結果を保存する空文字列
+  text_generated = []
+
+  # 低い temperature　は、より予測しやすいテキストをもたらし
+  # 高い temperature は、より意外なテキストをもたらす
+  # 実験により最適な設定を見つけること
+  temperature = 1.0
+
+  # ここではバッチサイズ　== 1
+  model.reset_states()
+  for i in range(num_generate):
+      predictions = model(input_eval)
+      # バッチの次元を削除
+      predictions = tf.squeeze(predictions, 0)
+
+      # カテゴリー分布をつかってモデルから返された文字を予測
+      predictions = predictions / temperature
+      predicted_id = tf.random.categorical(predictions, num_samples=1)[-1,0].numpy()
+
+      # 過去の隠れ状態とともに予測された文字をモデルへのつぎの入力として渡す
+      input_eval = tf.expand_dims([predicted_id], 0)
+
+      text_generated.append(id_to_word[predicted_id])
+
+  return (start_string + ''.join(text_generated))
+
 def main():
     corpus, word_to_id, id_to_word = load_dataset()
 
-    dataset = make_batch(corpus, 64)
-    for input_example, target_example in dataset.take(1):
-        print('Input data: ', input_example)
-        print(input_example.shape)
-        print('Target data:', target_example)
+    train, validation, test = make_batch(corpus, 64)
 
     model = tf.keras.Sequential([
         tf.keras.layers.Embedding(len(word_to_id), 64, batch_input_shape=[64, None]),
@@ -85,17 +137,22 @@ def main():
         tf.keras.layers.Dense(len(word_to_id))
     ])
     model.summary()
-    for input_example_batch, target_example_batch in dataset.take(2):
-        example_batch_predictions = model(input_example_batch)
-        print(example_batch_predictions.shape, "# (batch_size, sequence_length, vocab_size)")
 
     model.compile(
         loss=loss,
         optimizer=tf.keras.optimizers.Adam(1e-4))
 
+    # チェックポイントが保存されるディレクトリ
+    checkpoint_dir = './training_checkpoints'
+    # チェックポイントファイルの名称
+    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt_{epoch}")
 
-    history = model.fit(dataset, epochs=1000)
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=checkpoint_prefix,
+        save_weights_only=True)
 
+    history = model.fit(train, epochs=100, validation_data=validation, verbose=1, callbacks=[checkpoint_callback])
+    save_graph("output/nn.jpg", history)
 
 if '__main__' == __name__:
     main()
