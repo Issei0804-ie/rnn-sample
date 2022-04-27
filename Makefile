@@ -1,8 +1,11 @@
 build-sif:
 	singularity build --fakeroot output/tensorflow-gpu.sif tensorflow-gpu.def 
 
-run:
+build-model:
 	singularity run --nv output/tensorflow-gpu.sif python temp.py
+
+run:
+	singularity run --nv output/tensorflow-gpu.sif python generate.py
 
 pip-install:
 	singularity run output/tensorflow-gpu.sif pip install -r requirements.txt

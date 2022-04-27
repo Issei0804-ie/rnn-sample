@@ -13,9 +13,12 @@ Python 3.8.2
 make build-sif
 make pip-install
 
-# slum 使うなら
+# slurm を使ってモデル生成
 sbatch tensor.batch
 
-# singularity で実行するなら
-make run
+# モデルの生成
+make build-model
+
+# 文章の生成
+make run 
 ```
